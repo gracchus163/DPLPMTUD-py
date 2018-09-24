@@ -1,0 +1,1 @@
+{"base":1200, "step": ["9", "7"], "max":1500, "table":[["1300","1350"],["1250","1260","1270","1280"]], "max-probes":10, "probe-timer":1, "four":true, "six":false, "server-address4":"137.50.17.188", "server-port4":10002, "server-address6":"2001:630:42:110:16f:79e3:d925:18cf", "server-port6":10006}
