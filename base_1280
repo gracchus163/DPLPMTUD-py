@@ -1,0 +1,50 @@
+(u'fc00::0001', 10006, 0, 0)
+{u'token': u'67f0e3d42e94bbc64b552fe26d9644dde6ee551d', u'version': 0, u'type': u'init', u'addr': u'fc00::0001', u'time': 1536837279.827423}
+179
+mtu 200pad 21
+len j_msg: 200
+sending probe of 200
+RTT: 0.052629 Probe_timer 0.071577
+196
+mtu 1280pad 1084
+len j_msg: 1280
+sending probe of 1280
+probe timeout 1 on MTU: 1280 with timer of 0.071577
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 2 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 3 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 4 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 5 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 6 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 7 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 8 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 9 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+len j_msg: 1280
+sending probe of 1280
+probe timeout 10 on MTU: 1280 with timer of 0.100000
+reset timer to 0.100000
+path confirmation failed
