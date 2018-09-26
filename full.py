@@ -5,7 +5,17 @@ import uuid
 import time
 import json
 from conf import *
+import os
+import scapy.all as scapy
+import collections
 
+def ptb_callback(pkt):
+    if pkt[scapy.ICMP][2].dport == server_port:
+        #pkt[scapy.ICMP][2].show()
+        print(pkt[scapy.ICMP][2].len)
+        print("OHAYUUUUUUUU")
+def ptb():
+    scapy.sniff(filter="icmp[icmptype]=3 and icmp[icmpcode]=4", prn=ptb_callback)
 
 def SEARCH(step):
     print("additive search with step of "+str(step))
@@ -53,16 +63,17 @@ def send_probe(mtu):
     PROBE_COUNT=0
     global PROBE_TIMER
     sock.settimeout(PROBE_TIMER)
-    msg = {
-            "token":token,
-            "time": timestamp,
-            "addr": server_address,
-            "version": ver,
-            "mtu": mtu,
-            "padding" : "",
-            "real_rtt": real_rtt,
-            "probe_timer": PROBE_TIMER
-            }
+    tuple_msg = [
+            ("token",token),
+            ("time", timestamp),
+            ("addr", server_address),
+            ("version", ver),
+            ("mtu", mtu),
+            ("padding" , ""),
+            ("real_rtt", real_rtt),
+            ("probe_timer", PROBE_TIMER)]
+    msg = collections.OrderedDict(tuple_msg)
+            
     j_msg = json.dumps(msg)
     pad = mtu-len(j_msg)
     if pad < 0:
@@ -143,6 +154,11 @@ timestamp=time.time()
 real_rtt=args.rtt
 
 PROBE_TIMER = DEFAULT_PROBE_TIMER
+ptb_pid = os.fork()
+if ptb_pid == 0:
+    ptb()
+    exit()
+
 if args.four:
     type_af = socket.AF_INET
     header_len=28
@@ -178,5 +194,6 @@ for t in mtu_table:
 
 send_results(results)
 print >>sys.stderr, 'closing socket'
+os.kill(ptb_pid, 9)
 sock.close()
 
