@@ -11,6 +11,7 @@ import collections
 
 def ptb_callback(pkt):
     icmU = pkt[scapy.ICMP][2]
+    print("pr")
     if icmU.dport == server_port:
         #pkt[scapy.ICMP][2].show()
         print(icmU.len)
@@ -20,6 +21,17 @@ def ptb_callback(pkt):
             print("PTB from our packet")
 def ptb():
     scapy.sniff(filter="icmp[icmptype]=3 and icmp[icmpcode]=4", prn=ptb_callback)
+def ptb6_callback(pkt):
+    icmU = pkt[scapy.ICMPv6PacketTooBig][2]
+    print("pr6")
+    if icmU.dport == server_port:
+        print(icmU.len)
+        print("OHAYUUUUUUUU")
+        s = icmU[scapy.Raw].load
+        if  token in s:
+            print("PTB6 from our packet")
+def ptb6():
+    scapy.sniff(filter="icmp6 and ip6[40] == 2",prn=ptb6_callback)
 
 def SEARCH(step):
     print("additive search with step of "+str(step))
@@ -166,6 +178,10 @@ if args.four:
     sock.setsockopt(socket.IPPROTO_IP, IN.IP_MTU_DISCOVER, IN.IP_PMTUDISC_PROBE)
     addr = (server_address, server_port)
     token = init()
+    ptb_pid = os.fork()
+    if ptb_pid == 0:
+        ptb()
+        exit()
 else:
     type_af = socket.AF_INET6
     header_len=48
@@ -174,11 +190,11 @@ else:
     sock.setsockopt(socket.IPPROTO_IPV6, IN.IPV6_MTU_DISCOVER, IN.IP_PMTUDISC_PROBE)
     addr = (server_address, server_port, 0,0)
     token = init()
+    ptb_pid = os.fork()
+    if ptb_pid == 0:
+        ptb6()
+        exit()
 
-ptb_pid = os.fork()
-if ptb_pid == 0:
-    ptb()
-    exit()
 
 sock.settimeout(PROBE_TIMER)
 
