@@ -10,10 +10,14 @@ import scapy.all as scapy
 import collections
 
 def ptb_callback(pkt):
-    if pkt[scapy.ICMP][2].dport == server_port:
+    icmU = pkt[scapy.ICMP][2]
+    if icmU.dport == server_port:
         #pkt[scapy.ICMP][2].show()
-        print(pkt[scapy.ICMP][2].len)
+        print(icmU.len)
         print("OHAYUUUUUUUU")
+        s = icmU[scapy.Raw].load
+        if  token in s:
+            print("PTB from our packet")
 def ptb():
     scapy.sniff(filter="icmp[icmptype]=3 and icmp[icmpcode]=4", prn=ptb_callback)
 
@@ -154,11 +158,6 @@ timestamp=time.time()
 real_rtt=args.rtt
 
 PROBE_TIMER = DEFAULT_PROBE_TIMER
-ptb_pid = os.fork()
-if ptb_pid == 0:
-    ptb()
-    exit()
-
 if args.four:
     type_af = socket.AF_INET
     header_len=28
@@ -175,6 +174,11 @@ else:
     sock.setsockopt(socket.IPPROTO_IPV6, IN.IPV6_MTU_DISCOVER, IN.IP_PMTUDISC_PROBE)
     addr = (server_address, server_port, 0,0)
     token = init()
+
+ptb_pid = os.fork()
+if ptb_pid == 0:
+    ptb()
+    exit()
 
 sock.settimeout(PROBE_TIMER)
 
