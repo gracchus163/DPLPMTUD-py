@@ -19,6 +19,7 @@ parser.add_argument("--max-probes",help="maximum probes to send before calling i
 parser.add_argument("-c", "--config", help="json file containing configuration options")
 parser.add_argument("--four", help="enable ipv4", action="store_true")
 parser.add_argument("--six", help="enable ipv6", action="store_true")
+parser.add_argument("--ptb", help="enable path too big", action="store_true")
 parser.add_argument("--server-address4")
 parser.add_argument("--server-port4", type=int)
 parser.add_argument("--server-address6")
