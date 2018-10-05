@@ -27,7 +27,7 @@ def ptb_callback(pkt):
             global ptb_recv_mutex
             ptb_recv_mutex = True
             global ptb_val_mutex
-            ptb_val_mutex = icmU.len
+            ptb_val_mutex = pkt[scapy.ICMP].nexthopmtu
             global ptb_sport
             ptb_sport = icmU.sport
             ptb_lock.release()
@@ -42,6 +42,14 @@ def ptb6_callback(pkt):
         s = icmU[scapy.Raw].load
         if  token in s:
             print("PTB6 from our packet")
+            ptb_lock.acquire()
+            global ptb_recv_mutex
+            ptb_recv_mutex = True
+            global ptb_val_mutex
+            ptb_val_mutex = pkt[scapy.ICMPv6PacketTooBig].mtu
+            global ptb_sport
+            ptb_sport = icmU.sport
+            ptb_lock.release()
 def ptb6():
     scapy.sniff(filter="icmp6 and ip6[40] == 2",prn=ptb6_callback)
 
@@ -52,8 +60,21 @@ def SEARCH(step):
     count=0
     st = time.time()
     for probe_size in range(BASE_PMTU,(MAX_PMTU+1)-header_len, step):
-        if(not send_probe(probe_size, plpmtu)):
+        reply, ptb_len = send_probe(probe_size, plpmtu)
+        if(plpmtu == ptb_len-header_len):
             break
+        if ptb_len-header_len > plpmtu:
+            probe_size = ptb_len-header_len
+            reply, ptb_len = send_probe(probe_size, plpmtu)
+            if reply: #search complete
+                plpmtu=probe_size
+                count+=1
+                break
+            else:
+                print "everything broken"
+        if(not reply):
+            break
+
         plpmtu=probe_size
         count+=1
     return {"step":step, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st), "est_rtt":PROBE_TIMER}
@@ -70,7 +91,19 @@ def SEARCH_table(table):
         if probe_size > MAX_PMTU-header_len:
             break
         print("table probe of "+str(probe_size))
-        if(not send_probe(probe_size, plpmtu)):
+        reply, ptb_len = send_probe(probe_size, plpmtu)
+        if ptb_len-header_len == plpmtu:
+            break
+        if ptb_len-header_len > plpmtu:
+            probe_size = ptb_len-header_len
+            reply, ptb_len = send_probe(probe_size, plpmtu)
+            if reply: #search complete
+                plpmtu=probe_size
+                count+=1
+                break
+            else:
+                print "everything broken panic"
+        if not reply:
             break
         print("table updat PLPMTU to: "+str(probe_size))
         plpmtu=probe_size
@@ -79,12 +112,12 @@ def SEARCH_table(table):
 
 			
 def path_confirmation():
-    if not send_probe(300,300):
+    if not send_probe(300,300)[0]:
         return False
-    return send_probe(BASE_PMTU, BASE_PMTU)
+    return send_probe(BASE_PMTU, BASE_PMTU)[0]
 
 def smooth_rtt(n):
-    weight = 0.9 # 0 <= weight < 1
+    weight = 0.4 # 0 <= weight < 1
     return (weight*PROBE_TIMER)+((1-weight)*n)
     #return DEFAULT_PROBE_TIMER
 
@@ -112,13 +145,13 @@ def send_probe(probe_size,plpmtu):
     print("probe_size "+str(probe_size)+"pad "+str(pad))
     msg["padding"] = "T"*pad
     j_msg = json.dumps(msg)
-    global sport
     sport = sock.getsockname()[1]
     while True:
         u = uuid.uuid4()
         print("len j_msg: "+str(len(j_msg)))
         
         if args.ptb:
+            ptb_len = -1
             ptb_lock.acquire()
             print("locked")
             global ptb_recv_mutex
@@ -127,35 +160,38 @@ def send_probe(probe_size,plpmtu):
             if (ptb_recv_mutex and  ptb_sport==sport):
                 ptb_recv_mutex = False
                 ptb_len = ptb_val_mutex
-                print("PTB from our packet")
-                if ptb_len == plpmtu:
-                    return False    #search complete
+                ptb_lock.release()
+                print("PTB from our packet with len: %d"%(ptb_len))
+                return (False, ptb_len)    #search complete
             ptb_lock.release()
 
         time_send = time.time()
         sock.sendto(j_msg+u.hex, addr)
-
-        try:
-                print("sending probe of "+str(len(j_msg+u.hex)))
+        sport = sock.getsockname()[1]
+        print("sending probe of "+str(len(j_msg+u.hex)))
+        timeout = time.time()+PROBE_TIMER
+        while time.time() < timeout:
+            try:
                 data, server = sock.recvfrom(MAX_PMTU)
-                print data
-                print u.hex
-                if u.hex not in data:
-                    continue
-                time_rtt = time.time() - time_send
-                PROBE_TIMER = smooth_rtt(time_rtt)
-                print("RTT: %f Probe_timer %f" % (time_rtt,PROBE_TIMER))
-        except socket.timeout as err:
-                PROBE_COUNT +=1
-                print("probe timeout %d on probe_size: %d with timer of %f" % (PROBE_COUNT, probe_size, PROBE_TIMER))
-    #            PROBE_TIMER = DEFAULT_PROBE_TIMER
-     #           print("reset timer to %f" % (PROBE_TIMER))
-                if PROBE_COUNT >= MAX_PROBES:
-                        PROBE_COUNT=0
-                        return False
+            except:
+                break
+            print data
+            print u.hex
+            if u.hex not in data:
                 continue
-        else:
-            return True
+            time_rtt = time.time() - time_send
+            PROBE_TIMER = smooth_rtt(time_rtt)
+            print("RTT: %f Probe_timer %f" % (time_rtt,PROBE_TIMER))
+            return (True,-1)
+        PROBE_COUNT +=1
+        print("probe timeout %d on probe_size: %d with timer of %f" % (PROBE_COUNT, probe_size, PROBE_TIMER))
+#            PROBE_TIMER = DEFAULT_PROBE_TIMER
+#           print("reset timer to %f" % (PROBE_TIMER))
+        if PROBE_COUNT >= MAX_PROBES:
+            PROBE_COUNT=0
+            return (False,-1)
+        continue
+
 def init():
     data = {
             "type" : "init",

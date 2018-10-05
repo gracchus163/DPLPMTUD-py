@@ -1,1 +1,1 @@
-{"base":1200, "step":["1"], "table":[["1210"]],"max":1500, "max-probes":10, "probe-timer":0.1, "four":true, "six":false, "server-address4":"192.168.1.1", "server-port4":10000, "server-address6":"fc00::0001", "server-port6":10006}
+{"base":1200, "step":["1"], "table":[["1300"]],"max":1500, "max-probes":10, "probe-timer":0.1, "four":true, "six":false, "server-address4":"192.168.1.1", "server-port4":10000, "server-address6":"fc00::0001", "server-port6":10006}
