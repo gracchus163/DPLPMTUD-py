@@ -80,7 +80,7 @@ for i in data:
     real_link = i["real_mtu"]
     real_rtt = i["real_rtt"]
     est_rtt = "{0:.4f}".format(i["probe_timer"])
-    ii = i["ipv"]
+    ii = "ipv"+str(i["ipv"])
     step1["Real link size"].append(real_link)  
     step7["Real link size"].append(real_link)  
     step9["Real link size"].append(real_link)  
