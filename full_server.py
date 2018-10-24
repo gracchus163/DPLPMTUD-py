@@ -5,7 +5,9 @@ import hashlib
 import threading
 import os
 import argparse
+import logging
 
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 salt = "secret experiment salty boi"
 tl = 5
 
@@ -47,36 +49,39 @@ tsock4.bind((server_address4,server_port4))
 tsock4.listen(tl) 
 
 tsock6 = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-tsock6.bind((server_address6, server_port6, 0, 0))
+tsock6.bind(("::1", 10006, 0,0))
+#tsock6.bind((server_address6,server_port6,0,0))
 tsock6.listen(tl) 
 
 def handle_client_connection(client_socket):
         reply = client_socket.recv(1024)
-	request = json.loads(reply)
-        if request["type"] == "init":
-            print "init"
-            hash = hashlib.sha1()
-            hash.update(str(request["time"]))
-            hash.update(request["addr"])
-            hash.update(salt)
-            request["token"] = hash.hexdigest() 
-            client_socket.send(json.dumps(request))
-        elif request["type"] == "fin":
-            print "fin"
-            f=open("results", "a")
-            f.write(reply)
-            f.close()
-
+        try:
+            request = json.loads(reply)
+            if request["type"] == "init":
+                logging.info("Received init")
+                hash = hashlib.sha1()
+                hash.update(str(request["time"]))
+                hash.update(request["addr"])
+                hash.update(salt)
+                request["token"] = hash.hexdigest() 
+                client_socket.send(json.dumps(request))
+            elif request["type"] == "fin":
+                logging.info("Received fin")
+                f=open("results", "a")
+                f.write(reply)
+                f.close()
+        except:
+            logging.warning("received not json")
 	client_socket.close()
-	print("closed")
+	logging.info("closed")
 
 def run_http(tsock):
     while True:
-        print("waiting to accept")
+        logging.info("waiting to accept")
 	client_sock, address = tsock.accept()
-	print 'Accepted connection from {}:{}'.format(address[0], address[1])
+	logging.info('Accepted connection from {}:{}'.format(address[0], address[1]))
 	handle_client_connection(client_sock)
-	print("handled")
+	logging.info("handled")
 
 http_pid4 = os.fork()
 if http_pid4 == 0:
@@ -98,28 +103,31 @@ def confirm_token(token, addr, time):
 def udp_serve(sock):
 
     while True:
-        print >>sys.stderr, '\nwaiting to receive message'
+        logging.debug("waiting to receive probe")
         data, address = sock.recvfrom(65536)
         
-        print >>sys.stderr, 'received %s bytes from %s' % (len(data), address)
-        print >>sys.stderr, data
+        logging.debug("received %s bytes from %s" % (len(data), address))
+        logging.debug(data)
         
         if not data:
             continue
-        jsn = json.loads(data)
-        if not confirm_token(jsn["token"],jsn["addr"],jsn["time"]):
-            print ("not confirmed")
-            continue
-        sent = sock.sendto(str(len(data)), address)
-        print >>sys.stderr, 'sent %s back to %s' % (str(len(data)), address)
-
+        try:
+            jsn = json.loads(data[:-32])
+            if not confirm_token(jsn["token"],jsn["addr"],jsn["time"]):
+                logging.warning("Token not confirmed")
+                continue
+            sent = sock.sendto("ack"+str(len(data))+"probe_received"+data[-32:], address)
+            logging.debug("sent %s back to %s" % (str(len(data)), address))
+        except:
+            logging.warning("Bad probe")
 usock4 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-print >>sys.stderr, 'starting up on %s ' % server_address4
+logging.info("starting up on %s " % server_address4)
 usock4.bind((server_address4,server_port4))
 
 usock6 = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
-print >>sys.stderr, 'starting up on %s ' % server_address6
-usock6.bind((server_address6, server_port6, 0,0))
+logging.info("starting up on %s " % server_address6)
+#usock6.bind((server_address6, server_port6, 0,0))
+usock6.bind(("::1", 10006, 0,0))
 
 
 udp_pid4 = os.fork()
@@ -132,3 +140,5 @@ if udp_pid6 == 0:
     udp_serve(usock6)
     exit()
 
+for id in [http_pid6,http_pid4, udp_pid4,udp_pid6]:
+    os.waitpid(id,0)
