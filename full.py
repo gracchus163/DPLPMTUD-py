@@ -16,7 +16,6 @@ ptb_lock = thread.allocate_lock()
 ptb_recv_mutex = False
 ptb_val_mutex = 0
 ptb_sport = 0
-est_rtt = 0.0
 
 def ptb_callback(pkt):
     icmU = pkt[scapy.ICMP][2]
@@ -86,7 +85,7 @@ def SEARCH(step):
 
         plpmtu=probe_size
         count+=1
-    return {"step":step, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st), "est_rtt":est_rtt, "notes":extra}
+    return {"step":step, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st), "est_rtt":SRTT, "notes":extra}
 
 
 def SEARCH_table(table):
@@ -126,7 +125,7 @@ def SEARCH_table(table):
         logging.debug("table updat PLPMTU to: "+str(probe_size))
         plpmtu=probe_size
         count+=1
-    return {"table":table, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st),"est_rtt":est_rtt, "notes":extra}
+    return {"table":table, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
 
 			
 def path_confirmation():
@@ -135,13 +134,19 @@ def path_confirmation():
     return send_probe(BASE_PMTU, BASE_PMTU)[0]
 
 def smooth_rtt(n):
-    weight = 0.4 # 0 <= weight < 1
-    return (weight*PROBE_TIMER)+((1-weight)*n)
+    weight = 0.8 # 0 <= weight < 1
+    return (weight*SRTT)+((1-weight)*n)
     #return DEFAULT_PROBE_TIMER
+#from RFC2698-computing TCP's retransmission timer
+def rtt_var(n):
+    weight = 0.25
+    return (1-weight) * RTTVAR + weight * abs(SRTT - n)
 
 def send_probe(probe_size,plpmtu):
     PROBE_COUNT=0
     global PROBE_TIMER
+    global SRTT
+    global RTTVAR
     sock.settimeout(PROBE_TIMER)
     tuple_msg = [
             ("token",token),
@@ -163,11 +168,8 @@ def send_probe(probe_size,plpmtu):
     msg["padding"] = "T"*pad
     j_msg = json.dumps(msg)
     sport = sock.getsockname()[1]
-    window = []
-    sent_times = []
     while True:
         u = uuid.uuid4()
-        window.append(u)
         logging.debug("len j_msg: "+str(len(j_msg)))
         
         if args.ptb:
@@ -186,7 +188,6 @@ def send_probe(probe_size,plpmtu):
 
         sock.settimeout(PROBE_TIMER)
         time_send = time.time()
-        sent_times.append(time_send)
 
         sock.sendto(j_msg+u.hex, addr)
         sport = sock.getsockname()[1]
@@ -201,25 +202,14 @@ def send_probe(probe_size,plpmtu):
                 logging.info("timeout break")
                 break
             logging.info("data received"+ data)
-            #for w, t in zip(window, sent_times):
-            #    if w.hex in data:
-            #        time_rtt = time.time() - t
-            #        PROBE_TIMER = smooth_rtt(time_rtt)
-            #        global est_rtt
-            #        est_rtt = PROBE_TIMER
-            #        logging.debug("RTT: %f Probe_timer %f" % (time_rtt,PROBE_TIMER))
-            #        return (True,-1)
-            #        break
-            #continue #window.hex not in data
-            #prev behaviour
             if u.hex not in data:
                 print("wrong hex")
                 continue
             time_rtt = time.time() - time_send
-            PROBE_TIMER = smooth_rtt(time_rtt)
-            global est_rtt
-            est_rtt = PROBE_TIMER
-            logging.debug("RTT: %f Probe_timer %f" % (time_rtt,PROBE_TIMER))
+            RTTVAR = rtt_var(time_rtt)
+            SRTT= smooth_rtt(time_rtt)
+            PROBE_TIMER = SRTT+RTTVAR*4
+            logging.debug("RTT: %f Probe_timer %f SRTT %f RTTVAR %f" % (time_rtt,PROBE_TIMER, SRTT, RTTVAR))
             return (True,-1)
         PROBE_COUNT +=1
         logging.info("probe timeout %d on probe_size: %d with timer of %f" % (PROBE_COUNT, probe_size, PROBE_TIMER))
@@ -281,6 +271,9 @@ timestamp=time.time()
 real_rtt=args.rtt
 
 PROBE_TIMER = DEFAULT_PROBE_TIMER
+SRTT = DEFAULT_PROBE_TIMER
+RTTVAR = DEFAULT_PROBE_TIMER/2
+
 if args.four:
     type_af = socket.AF_INET
     opt = (socket.IPPROTO_IP, IN.IP_MTU_DISCOVER, IN.IP_PMTUDISC_PROBE)
