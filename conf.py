@@ -29,6 +29,7 @@ parser.add_argument("--server-port6", type=int)
 parser.add_argument("-r","--real", help="Real link MTU", default="not set")
 parser.add_argument("--rtt", help="Real trip time", default="not set")
 parser.add_argument("--notes", help="Extra info about the experiment")
+parser.add_argument("--bi", help="Enables a binary search experiment", action="store_true")
 
 
 #commands with - are replaced with _ in the variable --server-port6 -> args.server_port6
@@ -59,6 +60,7 @@ if args.config:
             server_port6 = j["server-port6"]
         if "notes" in j:
             notes = j["notes"]
+         
 
 if(not args.four and not args.six):
     print("Need to specify IPv4 or IPv6.")

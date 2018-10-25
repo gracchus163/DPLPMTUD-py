@@ -126,7 +126,28 @@ def SEARCH_table(table):
         plpmtu=probe_size
         count+=1
     return {"table":table, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
-
+def SEARCH_bi():
+    top = MAX_PMTU-header_len
+    bot = BASE_PMTU
+    plpmtu = BASE_PMTU
+    st = time.time()
+    extra = ""
+    count = 0
+    while True:
+        probe = int((top+bot)/2)
+        #probe = int(bot+((top-bot)/2.5))
+        reply, ptb_len = send_probe(probe, plpmtu)
+        count += 1
+        if reply:
+            plpmtu = probe
+            if top == bot:
+                break
+            bot = probe+1
+        else:
+            top = probe-1
+        if top < bot:
+            break
+    return {"limits":MAX_PMTU, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
 			
 def path_confirmation():
     if not send_probe(300,300)[0]:
@@ -216,6 +237,8 @@ def send_probe(probe_size,plpmtu):
 #        PROBE_TIMER = smooth_rtt(DEFAULT_PROBE_TIMER)       #somewhat hacky to fix consistent late timeouts. I think the probetimer should be modified on timeout, how to?
         if (PROBE_COUNT%3)==0 :
             PROBE_TIMER *= 2
+            if PROBE_TIMER >= 15:
+                PROBE_TIMER = 14
         logging.info("upped timer to %f" % (PROBE_TIMER))
         if PROBE_COUNT >= MAX_PROBES:
             PROBE_COUNT=0
@@ -262,6 +285,8 @@ def send_results(res):
             "notes": notes
             }
     msg = json.dumps(data)
+    print(data)
+    print(msg)
     client.send(msg)
     logging.info("sent results")
     client.close()
@@ -304,7 +329,8 @@ if not path_confirmation():
     exit(-1)
 sock = socket.socket(type_af, socket.SOCK_DGRAM)
 sock.setsockopt(opt[0],opt[1],opt[2])
-results = {"step1":SEARCH(1)}
+results = {}
+#results = {"step1":SEARCH(1)}
 for s in step_search:
     PROBE_TIMER = DEFAULT_PROBE_TIMER
     sock = socket.socket(type_af, socket.SOCK_DGRAM)
@@ -320,6 +346,11 @@ for t in mtu_table:
     sock.setsockopt(opt[0],opt[1],opt[2])
     results["table"+str(num_tables)] = SEARCH_table(t)
     num_tables += 1
+if args.bi:
+    PROBE_TIMER = DEFAULT_PROBE_TIMER
+    sock = socket.socket(type_af, socket.SOCK_DGRAM)
+    sock.setsockopt(opt[0],opt[1],opt[2])
+    results["bi"]= SEARCH_bi()
 
 send_results(results)
 sock.close()

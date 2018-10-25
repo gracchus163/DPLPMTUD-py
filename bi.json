@@ -1,0 +1,1 @@
+{"base":1200,"max":1500, "max-probes":10, "probe-timer":0.1, "four":true, "six":false, "server-address4":"35.233.153.226", "server-port4":80, "server-address6":"fc00::0001", "server-port6":10006}
