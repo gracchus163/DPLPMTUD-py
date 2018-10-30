@@ -234,11 +234,10 @@ def send_probe(probe_size,plpmtu):
             return (True,-1)
         PROBE_COUNT +=1
         logging.info("probe timeout %d on probe_size: %d with timer of %f" % (PROBE_COUNT, probe_size, PROBE_TIMER))
-#        PROBE_TIMER = smooth_rtt(DEFAULT_PROBE_TIMER)       #somewhat hacky to fix consistent late timeouts. I think the probetimer should be modified on timeout, how to?
         if (PROBE_COUNT%3)==0 :
             PROBE_TIMER *= 2
-            if PROBE_TIMER >= 15:
-                PROBE_TIMER = 14
+            if PROBE_TIMER >= 1:
+                PROBE_TIMER = 1
         logging.info("upped timer to %f" % (PROBE_TIMER))
         if PROBE_COUNT >= MAX_PROBES:
             PROBE_COUNT=0

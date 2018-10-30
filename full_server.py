@@ -54,8 +54,9 @@ tsock6.bind(("::1", 10006, 0,0))
 tsock6.listen(tl) 
 
 def handle_client_connection(client_socket):
-        reply = client_socket.recv(1024)
+        reply = client_socket.recv(10000)
         try:
+            print(reply)
             request = json.loads(reply)
             if request["type"] == "init":
                 logging.info("Received init")
