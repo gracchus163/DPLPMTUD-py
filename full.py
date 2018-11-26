@@ -147,7 +147,7 @@ def SEARCH_bi():
             top = probe-1
         if top < bot:
             break
-    return {"limits":MAX_PMTU, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
+    return {"plpmtu":plpmtu,"limits":MAX_PMTU, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
 			
 def path_confirmation():
     if not send_probe(300,300)[0]:
@@ -224,7 +224,7 @@ def send_probe(probe_size,plpmtu):
                 break
             logging.info("data received"+ data)
             if u.hex not in data:
-                print("wrong hex")
+                logging.debug("wrong hex")
                 continue
             time_rtt = time.time() - time_send
             RTTVAR = rtt_var(time_rtt)
@@ -236,9 +236,9 @@ def send_probe(probe_size,plpmtu):
         logging.info("probe timeout %d on probe_size: %d with timer of %f" % (PROBE_COUNT, probe_size, PROBE_TIMER))
         if (PROBE_COUNT%3)==0 :
             PROBE_TIMER *= 2
-            if PROBE_TIMER >= 1:
-                PROBE_TIMER = 1
-        logging.info("upped timer to %f" % (PROBE_TIMER))
+            if PROBE_TIMER >= 10:
+                PROBE_TIMER = 10
+            logging.info("upped timer to %f" % (PROBE_TIMER))
         if PROBE_COUNT >= MAX_PROBES:
             PROBE_COUNT=0
             return (False,-1)

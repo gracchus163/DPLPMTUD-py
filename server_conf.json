@@ -1,1 +1,1 @@
-{"server-address4": "10.138.0.2", "server-port4": 80, "server-address6":"fe80::4001:aff:fe8a:2%eth0", "server-port6":10006, "listen":5, "salt":"secret experiment salt"}
+{"server-address4": "192.168.1.1", "server-port4": 80, "server-address6":"fe80::4001:aff:fe8a:2%eth0", "server-port6":10006, "listen":5, "salt":"secret experiment salt"}

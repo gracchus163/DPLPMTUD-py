@@ -1,1 +1,1 @@
-{"base":1200, "step":["1","7","9"], "table":[["1300","1350"],["1250","1260","1270","1280"]],"max":1500, "max-probes":10, "probe-timer":0.1, "four":true, "six":false, "server-address4":"192.168.1.1", "server-port4":10000, "server-address6":"fc00::0001", "server-port6":10006}
+{"base":1200, "step":["1","7","9"], "table":[["1300","1350"],["1250","1260","1270","1280"]],"max":1500, "max-probes":10, "probe-timer":0.1, "four":true, "six":false, "server-address4":"192.168.1.1", "server-port4":80, "server-address6":"fc00::0001", "server-port6":10006}
