@@ -8,6 +8,8 @@ step_search = []
 mtu_table=[[]]
 notes = ""
 DEFAULT_PROBE_TIMER = 15
+CONFIRMATION_TIMER = 10
+RAISE_TIMER = 60
 max_probes=10
 # Command line options overwrite config options
 
@@ -30,6 +32,7 @@ parser.add_argument("-r","--real", help="Real link MTU", default="not set")
 parser.add_argument("--rtt", help="Real trip time", default="not set")
 parser.add_argument("--notes", help="Extra info about the experiment")
 parser.add_argument("--bi", help="Enables a binary search experiment", action="store_true")
+parser.add_argument("--state", help="Runs the full state machine with timers instead of different searches", action="store_true")
 
 
 #commands with - are replaced with _ in the variable --server-port6 -> args.server_port6

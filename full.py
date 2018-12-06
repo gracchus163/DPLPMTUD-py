@@ -54,6 +54,9 @@ def ptb6():
     scapy.sniff(filter="icmp6 and ip6[40] == 2",prn=ptb6_callback)
 
 def SEARCH(step):
+    #PROBE_SEARCH
+    if args.state:
+        state_sock.send("PROBE_SEARCH")
     logging.debug("additive search with step of "+str(step))
     probe_size=BASE_PMTU
     plpmtu=BASE_PMTU
@@ -78,17 +81,29 @@ def SEARCH(step):
             else:
                 extra += "PTBERR"
                 logging.error("Could not send probe of size PTB %d" %(ptb_len))
+        if ptb_len-header_len < BASE_PMTU and not ptb_len == -1:
+            #PROBE_ERROR
+            logging.error("PTB %d smaller than base_pmtu %d" %(ptb_len, BASE_PMTU))
+            return ({"plpmtu":plpmtu}, "PROBE_ERROR")
         if ptb_len-header_len < plpmtu and not ptb_len == -1 :
+            #PROBE_BASE
             logging.error("PTB %d smaller than plpmtu %d" %(ptb_len, plpmtu))
+            return ({"plpmtu":plpmtu}, "PROBE_BASE")
         if(not reply):
             break
 
         plpmtu=probe_size
         count+=1
-    return {"step":step, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st), "est_rtt":SRTT, "notes":extra}
+    #SEARCH_COMPLETE
+    if args.state:
+        state_sock.send("SEARCH_COMPLETE")
+    return ({"step":step, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st), "est_rtt":SRTT, "notes":extra}, "SEARCH_COMPLETE")
 
 
 def SEARCH_table(table):
+    #PROBE_SEARCH
+    if args.state:
+        state_sock.send("PROBE_SEARCH")
     logging.debug("table search start")
     plpmtu=BASE_PMTU    #path confirmation completed so base works
     t_list=[int(i) for i in table]
@@ -120,24 +135,50 @@ def SEARCH_table(table):
                 logging.error("Could not send probe of size PTB %d" %(ptb_len))
         if ptb_len-header_len < plpmtu and not ptb_len == -1 :
             logging.error("PTB %d smaller than plpmtu %d" %(ptb_len, plpmtu))
+            return ({"plpmtu":plpmtu}, "PROBE_BASE")
         if not reply:
             break
         logging.debug("table updat PLPMTU to: "+str(probe_size))
         plpmtu=probe_size
         count+=1
+    #SEARCH_COMPLETE
+    if args.state:
+        state_sock.send("SEARCH_COMPLETE")
     return {"table":table, "plpmtu":plpmtu, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
 def SEARCH_bi():
+    #PROBE_SEARCH
+    if args.state:
+        state_sock.send("PROBE_SEARCH")
     top = MAX_PMTU-header_len
     bot = BASE_PMTU
     plpmtu = BASE_PMTU
     st = time.time()
     extra = ""
     count = 0
+    if args.ptb:
+        extra += "PTBEN"
     while True:
         probe = int((top+bot)/2)
         #probe = int(bot+((top-bot)/2.5))
         reply, ptb_len = send_probe(probe, plpmtu)
         count += 1
+        if ptb_len-header_len == plpmtu:
+            extra+= "PTBEQ"     #PTB received and equal to plpmtu
+            break
+        if ptb_len-header_len > plpmtu:
+            probe_size = ptb_len-header_len
+            reply, ptb_len = send_probe(probe_size, plpmtu)
+            if reply: #search complete
+                plpmtu=probe_size
+                count+=1
+                extra += "PTBSR"    #PTB received and confirmed
+                break
+            else:
+                extra += "PTBERR"
+                logging.error("Could not send probe of size PTB %d" %(ptb_len))
+        if ptb_len-header_len < plpmtu and not ptb_len == -1 :
+            logging.error("PTB %d smaller than plpmtu %d" %(ptb_len, plpmtu))
+            return ({"plpmtu":plpmtu}, "PROBE_BASE")
         if reply:
             plpmtu = probe
             if top == bot:
@@ -147,9 +188,13 @@ def SEARCH_bi():
             top = probe-1
         if top < bot:
             break
+    #SEARCH_COMPLETE
+    if args.state:
+        state_sock.send("SEARCH_COMPLETE")
     return {"plpmtu":plpmtu,"limits":MAX_PMTU, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
 			
 def path_confirmation():
+    #PROBE_START
     if not send_probe(300,300)[0]:
         return False
     return send_probe(BASE_PMTU, BASE_PMTU)[0]
@@ -291,6 +336,31 @@ def send_results(res):
     client.close()
 
 
+def COMPLETE(plpmtu):
+    i = RAISE_TIMER/CONFIRMATION_TIMER
+    for x in range(i):
+        time.sleep(CONFIRMATION_TIMER)
+        ack, ptb_len = send_probe(plpmtu, plpmtu)
+        if (not ack) or (not ptb_len == -1 and (ptb_len < plpmtu)):
+            return "PROBE_BASE"
+        print "confirm"
+    print "raise"
+    return "PROBE_SEARCH"
+def BASE():
+    print "BASE"
+    state_sock.send("PROBE_BASE")
+    ack = path_confirmation()
+    if ack:
+        return "PROBE_SEARCH"
+    return "PROBE_ERROR"
+def ERROR():
+    print "ERROR"
+    state_sock.send("PROBE_ERROR")
+    ack = path_confirmation()
+    if ack:
+        return "PROBE_BASE"
+    return "PROBE_DISABLED"
+
 timestamp=time.time()
 real_rtt=args.rtt
 
@@ -322,20 +392,51 @@ else:
 sock = socket.socket(type_af, socket.SOCK_DGRAM)
 sock.setsockopt(opt[0],opt[1],opt[2])
 logging.debug("socket name: "+str(sock.getsockname()))
+if args.state:
+    state_sock = socket.socket(type_af, socket.SOCK_STREAM)
+    state_sock.connect(("192.168.2.100", 5679))
+    state_sock.send("INIT")
+    S = "PROBE_START"
+    state_sock.send("PROBE_START")
+    if not path_confirmation():
+        S = "PROBE_DISABLED"
+    else:
+        S = "PROBE_SEARCH"
+    while True:
+        if S == "PROBE_SEARCH":
+            r, S = SEARCH(10)
+            plpmtu = r["plpmtu"]
+        if S == "SEARCH_COMPLETE":
+            S = COMPLETE(plpmtu)
+        if S == "PROBE_BASE":
+            S = BASE()
+        if S == "PROBE_ERROR":
+            S = ERROR()
+        if S == "PROBE_DISABLED":
+            print "PROBE_DISABLED"
+            state_sock.send("PROBE_DISABLED");
+            exit(-1)
+
+if args.state:
+    state_sock.send("PROBE_START")
 if not path_confirmation():
     logging.error("path confirmation failed")
+    if args.state:
+        state_sock.send("PROBE_DISABLED");
     #send_results("Path confirmation failed")
     exit(-1)
 sock = socket.socket(type_af, socket.SOCK_DGRAM)
 sock.setsockopt(opt[0],opt[1],opt[2])
 results = {}
 #results = {"step1":SEARCH(1)}
+
+
 for s in step_search:
     PROBE_TIMER = DEFAULT_PROBE_TIMER
     sock = socket.socket(type_af, socket.SOCK_DGRAM)
     sock.setsockopt(opt[0],opt[1],opt[2])
-
-    results["step"+s] = SEARCH(int(s))
+    r, blackhole = SEARCH(int(s))    
+    results["step"+s] = r
 num_tables = 1
 for t in mtu_table:
     if not t:
@@ -353,4 +454,3 @@ if args.bi:
 
 send_results(results)
 sock.close()
-
