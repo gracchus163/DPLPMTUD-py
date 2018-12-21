@@ -157,6 +157,34 @@ def SEARCH_bi():
     count = 0
     if args.ptb:
         extra += "PTBEN"
+    #try upper bound first
+    reply, ptb_len = send_probe(top, plpmtu)
+    count += 1
+    if ptb_len-header_len == plpmtu:
+        extra+= "PTBEQ"     #PTB received and equal to plpmtu
+        if args.state:
+            state_sock.send("SEARCH_COMPLETE")
+        plpmtu = top
+        return {"plpmtu":plpmtu,"limits":MAX_PMTU, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
+    if ptb_len-header_len > plpmtu:
+        probe_size = ptb_len-header_len
+        reply, ptb_len = send_probe(probe_size, plpmtu)
+        if reply: #search complete
+            plpmtu=probe_size
+            count+=1
+            extra += "PTBSR"    #PTB received and confirmed
+        else:
+            extra += "PTBERR"
+            logging.error("Could not send probe of size PTB %d" %(ptb_len))
+    if ptb_len-header_len < plpmtu and not ptb_len == -1 :
+        logging.error("PTB %d smaller than plpmtu %d" %(ptb_len, plpmtu))
+        return ({"plpmtu":plpmtu}, "PROBE_BASE")
+    if reply:
+        if args.state:
+            state_sock.send("SEARCH_COMPLETE")
+        plpmtu = top
+        return {"plpmtu":plpmtu,"limits":MAX_PMTU, "count":count, "time_taken":(time.time()-st),"est_rtt":SRTT, "notes":extra}
+
     while True:
         probe = int((top+bot)/2)
         #probe = int(bot+((top-bot)/2.5))
